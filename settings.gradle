@@ -1,0 +1,101 @@
+pluginManagement {
+	repositories {
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
+
+plugins {
+	id 'com.diffplug.spotless' version '7.2.1' apply false
+	// https://plugins.gradle.org/plugin/com.gradle.plugin-publish
+	id 'com.gradle.plugin-publish' version '1.3.1' apply false
+	// https://github.com/gradle-nexus/publish-plugin/releases
+	id 'io.github.gradle-nexus.publish-plugin' version '2.0.0' apply false
+	// https://github.com/spotbugs/spotbugs-gradle-plugin/releases
+	id 'com.github.spotbugs' version '6.2.3' apply false
+	// https://github.com/diffplug/spotless-changelog/blob/main/CHANGELOG.md
+	id 'com.diffplug.spotless-changelog' version '3.1.2' apply false
+	// https://github.com/radarsh/gradle-test-logger-plugin/blob/develop/CHANGELOG.md
+	id 'com.adarshr.test-logger' version '4.0.0' apply false
+	// https://github.com/davidburstrom/version-compatibility-gradle-plugin/tags
+	id 'io.github.davidburstrom.version-compatibility' version '0.5.0' apply false
+	// https://plugins.gradle.org/plugin/com.gradle.develocity
+	id 'com.gradle.develocity' version '3.19.2'
+	// https://github.com/equodev/equo-ide/blob/main/plugin-gradle/CHANGELOG.md
+	id 'dev.equo.ide' version '1.7.8' apply false
+}
+
+dependencyResolutionManagement {
+	repositories {
+		mavenCentral()
+	}
+}
+
+if (System.env['CI'] != null) {
+	// use the remote buildcache on all CI builds
+	buildCache {
+		def cred = {
+			if (System.env[it] != null) {
+				return System.env[it]
+			} else {
+				return System.getProperty(it)
+			}
+		}
+		remote(HttpBuildCache) {
+			url = 'https://buildcache.diffplug.com/cache/'
+			// but we only push if it's a trusted build (not PRs)
+			String user = cred('buildcacheuser')
+			String pass = cred('buildcachepass')
+			if (user != null && pass != null) {
+				push = true
+				credentials {
+					username = user
+					password = pass
+				}
+			} else {
+				credentials { username = 'anonymous' }
+			}
+		}
+	}
+}
+
+def isCI = providers.environmentVariable('CI').present
+
+develocity {
+	buildScan {
+		termsOfUseUrl = "https://gradle.com/terms-of-service"
+		termsOfUseAgree = "yes"
+		publishing {
+			onlyIf { isCI }
+		}
+	}
+}
+
+enableFeaturePreview("STABLE_CONFIGURATION_CACHE")
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
+
+rootProject.name = 'spotless'
+
+include 'lib'		// reusable library with no dependencies
+include 'testlib'	// library for sharing test infrastructure between the projects below
+
+include 'lib-extra'	// reusable library with lots of dependencies
+include 'plugin-gradle'	// gradle-specific glue code
+
+def getStartProperty(java.lang.String name) {
+	def value = startParameter.getProjectProperties().get(name)
+	if(null != value) {
+		return value
+	}
+	// user properties are not available in the startParameter
+	def userPropertiesFile = new java.io.File(startParameter.getGradleUserHomeDir(), 'gradle.properties')
+	def userProperties = new java.util.Properties()
+	if (userPropertiesFile.exists()) {
+		userProperties.load(userPropertiesFile.newReader())
+	}
+	return userProperties.get(name)
+}
+
+if (System.getenv('SPOTLESS_EXCLUDE_MAVEN') != 'true' && getStartProperty('SPOTLESS_EXCLUDE_MAVEN') != 'true') {
+	include 'plugin-maven'	// maven-specific glue code
+}

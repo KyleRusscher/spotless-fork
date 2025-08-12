@@ -1,0 +1,104 @@
+plugins {
+	id 'java-library'
+	id 'dev.equo.p2deps'
+}
+ext.artifactId = project.artifactIdLibExtra
+version = rootProject.spotlessChangelog.versionNext
+apply from: rootProject.file('gradle/java-setup.gradle')
+apply from: rootProject.file('gradle/java-publish.gradle')
+
+String VER_SOLSTICE = '1.8.1'
+dependencies {
+	api projects.lib
+	// misc useful utilities
+	implementation "com.diffplug.durian:durian-core:${VER_DURIAN}"
+	implementation "com.diffplug.durian:durian-collect:${VER_DURIAN}"
+	// needed by GitAttributesLineEndings
+	implementation "org.eclipse.jgit:org.eclipse.jgit:${VER_JGIT}"
+	implementation "com.googlecode.concurrent-trees:concurrent-trees:2.6.1"
+	// for eclipse
+	implementation "dev.equo.ide:solstice:${VER_SOLSTICE}"
+	// the osgi dep is included in solstice, but it has some CVE's against it.
+	// 3.18.500 is the oldest, most-compatible version with no CVE's
+	// https://central.sonatype.com/artifact/org.eclipse.platform/org.eclipse.osgi/versions
+	implementation "org.eclipse.platform:org.eclipse.osgi:3.23.100"
+
+	// testing
+	testImplementation projects.testlib
+	testImplementation "org.junit.jupiter:junit-jupiter:${VER_JUNIT}"
+	testImplementation "org.assertj:assertj-core:${VER_ASSERTJ}"
+	testImplementation "com.diffplug.durian:durian-testlib:${VER_DURIAN}"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+spotless {
+	java {
+		replaceRegex 'enforceSolsticeVersion', '"dev.equo.ide:solstice:(.*)"', '"dev.equo.ide:solstice:' + VER_SOLSTICE + '"'
+	}
+}
+
+apply from: rootProject.file('gradle/special-tests.gradle')
+tasks.withType(Test).configureEach {
+	if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_16)) {
+		// needed for EclipseCdtFormatterStepTest
+		jvmArgs '--add-opens=java.base/java.lang=ALL-UNNAMED'
+	}
+}
+
+def NEEDS_P2_DEPS = [
+	// (alphabetic order please)
+	'cdt',
+	'groovy',
+	'jdt'
+]
+if (!JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_17)) {
+	NEEDS_P2_DEPS.remove('cdt')
+}
+for (needsP2 in NEEDS_P2_DEPS) {
+	sourceSets.register(needsP2) {
+		compileClasspath += sourceSets.main.output
+		runtimeClasspath += sourceSets.main.output
+		java {}
+	}
+	dependencies {
+		add("${needsP2}CompileOnly", "dev.equo.ide:solstice:${VER_SOLSTICE}")
+	}
+}
+
+def jar = tasks.named('jar', Jar) {
+	for (needsP2 in NEEDS_P2_DEPS) {
+		from sourceSets.named(needsP2).map { it.output.classesDirs }
+	}
+}
+
+tasks.withType(Test).configureEach {
+	dependsOn jar
+	classpath += jar.get().outputs.files
+}
+
+apply plugin: 'dev.equo.p2deps'
+p2deps {
+	into 'cdtCompileOnly', {
+		p2repo 'https://download.eclipse.org/eclipse/updates/4.26/'
+		p2repo 'https://download.eclipse.org/tools/cdt/releases/11.0/'
+		install 'org.eclipse.cdt.core'
+	}
+	into 'groovyCompileOnly', {
+		p2repo 'https://download.eclipse.org/eclipse/updates/4.26/'
+		p2repo 'https://groovy.jfrog.io/artifactory/plugins-release/org/codehaus/groovy/groovy-eclipse-integration/4.8.0/e4.26/'
+		install 'org.codehaus.groovy.eclipse.refactoring'
+		install 'org.codehaus.groovy.eclipse.core'
+		install 'org.eclipse.jdt.groovy.core'
+		install 'org.codehaus.groovy'
+	}
+	into 'jdtCompileOnly', {
+		p2repo 'https://download.eclipse.org/eclipse/updates/4.26/'
+		install 'org.eclipse.jdt.core'
+	}
+}
+
+// we'll hold the core lib to a high standard
+spotbugs {
+	// LOW|MEDIUM|DEFAULT|HIGH (low = sensitive to even minor mistakes).
+	reportLevel = com.github.spotbugs.snom.Confidence.valueOf('LOW')
+	excludeFilter = file("spotbugs-exclude.xml")
+}

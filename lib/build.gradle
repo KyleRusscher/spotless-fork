@@ -1,0 +1,164 @@
+import org.gradle.util.GradleVersion
+
+plugins {
+	id 'java-library'
+	id 'io.github.davidburstrom.version-compatibility'
+}
+ext.artifactId = project.artifactIdLib
+version = rootProject.spotlessChangelog.versionNext
+apply from: rootProject.file('gradle/java-setup.gradle')
+apply from: rootProject.file('gradle/java-publish.gradle')
+
+def NEEDS_GLUE = [
+	// (alphabetic order please)
+	'cleanthat',
+	'diktat',
+	'flexmark',
+	'gherkin',
+	'googleJavaFormat',
+	'gson',
+	'jackson',
+	'ktfmt',
+	'ktlint',
+	'palantirJavaFormat',
+	'scalafmt',
+	'sortPom',
+	'zjsonPatch',
+]
+for (glue in NEEDS_GLUE) {
+	sourceSets.register(glue) {
+		compileClasspath += sourceSets.main.output
+		runtimeClasspath += sourceSets.main.output
+		java {}
+	}
+}
+
+versionCompatibility {
+	adapters {
+		// (alphabetic order please)
+		namespaces.register('Cleanthat') {
+			versions = [
+				'2.1',
+			]
+			targetSourceSetName = 'cleanthat'
+		}
+		namespaces.register('KtLint') {
+			// as discussed at https://github.com/diffplug/spotless/pull/1475
+			// we will support no more than 2 breaking changes at a time = 3 incompatible versions
+			// we will try to drop down to only one version if a stable API can be maintained for a full year
+			versions = [
+				'0.48.0',
+				'0.49.0',
+				'0.50.0',
+				'1.0.0',
+			]
+			targetSourceSetName = 'ktlint'
+		}
+		namespaces.register('Diktat') {
+			versions = [
+				'1.2.5',
+				'2.0.0',
+			]
+			targetSourceSetName = 'diktat'
+		}
+	}
+}
+
+tasks.named("check").configure {
+	dependsOn(tasks.named("testCompatibilityAdapters"))
+	dependsOn(tasks.named("testCompatibility"))
+}
+
+dependencies {
+	compileOnly 'org.slf4j:slf4j-api:2.0.17'
+	testCommonImplementation 'org.slf4j:slf4j-api:2.0.17'
+
+	// zero runtime reqs is a hard requirements for spotless-lib
+	// if you need a dep, put it in lib-extra
+	testCommonImplementation "org.junit.jupiter:junit-jupiter:$VER_JUNIT"
+	testCommonImplementation "org.assertj:assertj-core:$VER_ASSERTJ"
+	testCommonImplementation "com.diffplug.durian:durian-testlib:$VER_DURIAN"
+	testCommonImplementation projects.testlib
+	testCommonRuntimeOnly "org.junit.platform:junit-platform-launcher"
+
+	// GLUE CODE (alphabetic order please)
+	// cleanthat
+	String VER_CLEANTHAT='2.23'
+	cleanthatCompileOnly "io.github.solven-eu.cleanthat:java:$VER_CLEANTHAT"
+	compatCleanthat2Dot1CompileAndTestOnly "io.github.solven-eu.cleanthat:java:$VER_CLEANTHAT"
+	// diktat old supported version 1.x
+	compatDiktat1Dot2Dot5CompileOnly "org.cqfn.diktat:diktat-rules:1.2.5"
+	// diktat latest supported version 2.x
+	compatDiktat2Dot0Dot0CompileOnly "com.saveourtool.diktat:diktat-runner:2.0.0"
+	// flexmark
+	flexmarkCompileOnly 'com.vladsch.flexmark:flexmark-all:0.64.8'
+	// gherkin
+	gherkinCompileOnly 'io.cucumber:gherkin-utils:9.2.0'
+	gherkinCompileOnly 'org.slf4j:slf4j-api:2.0.17'
+	// googleJavaFormat
+	googleJavaFormatCompileOnly 'com.google.googlejavaformat:google-java-format:1.28.0'
+	// gson
+	gsonCompileOnly 'com.google.code.gson:gson:2.13.1'
+	// jackson
+	String VER_JACKSON='2.19.2'
+	jacksonCompileOnly "com.fasterxml.jackson.core:jackson-databind:$VER_JACKSON"
+	jacksonCompileOnly "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:$VER_JACKSON"
+	// ktfmt
+	ktfmtCompileOnly "com.facebook:ktfmt:0.53"
+	ktfmtCompileOnly("com.google.googlejavaformat:google-java-format") {
+		version {
+			strictly '1.7' // for JDK 8 compatibility
+		}
+	}
+	// ktlint oldest supported version
+	compatKtLint0Dot48Dot0CompileAndTestOnly 'com.pinterest.ktlint:ktlint-core:0.48.0'
+	compatKtLint0Dot48Dot0CompileAndTestOnly 'com.pinterest.ktlint:ktlint-ruleset-experimental:0.48.0'
+	compatKtLint0Dot48Dot0CompileAndTestOnly 'com.pinterest.ktlint:ktlint-ruleset-standard:0.48.0'
+	// ktlint previous supported version
+	compatKtLint0Dot49Dot0CompileAndTestOnly 'com.pinterest.ktlint:ktlint-rule-engine:0.49.0'
+	compatKtLint0Dot49Dot0CompileAndTestOnly 'com.pinterest.ktlint:ktlint-ruleset-standard:0.49.0'
+	compatKtLint0Dot49Dot0CompileAndTestOnly 'org.slf4j:slf4j-api:2.0.17'
+	// ktlint previous supported version
+	compatKtLint0Dot50Dot0CompileAndTestOnly 'com.pinterest.ktlint:ktlint-rule-engine:0.50.0'
+	compatKtLint0Dot50Dot0CompileAndTestOnly 'com.pinterest.ktlint:ktlint-ruleset-standard:0.50.0'
+	compatKtLint0Dot50Dot0CompileAndTestOnly 'org.slf4j:slf4j-api:2.0.17'
+	// ktlint latest supported version
+	compatKtLint1Dot0Dot0CompileAndTestOnly 'com.pinterest.ktlint:ktlint-rule-engine:1.0.0'
+	compatKtLint1Dot0Dot0CompileAndTestOnly 'com.pinterest.ktlint:ktlint-ruleset-standard:1.0.0'
+	compatKtLint1Dot0Dot0CompileAndTestOnly 'org.slf4j:slf4j-api:2.0.17'
+	// palantirJavaFormat
+	palantirJavaFormatCompileOnly 'com.palantir.javaformat:palantir-java-format:1.1.0' 	// this version needs to stay compilable against Java 8 for CI Job testNpm
+	// scalafmt
+	scalafmtCompileOnly "org.scalameta:scalafmt-core_2.13:3.8.1"
+	// sortPom
+	sortPomCompileOnly 'com.github.ekryd.sortpom:sortpom-sorter:4.0.0'
+	sortPomCompileOnly 'org.slf4j:slf4j-api:2.0.17'
+	// zjsonPatch
+	zjsonPatchCompileOnly 'com.flipkart.zjsonpatch:zjsonpatch:0.4.16'
+}
+
+// we'll hold the core lib to a high standard
+spotbugs {
+	// LOW|MEDIUM|DEFAULT|HIGH (low = sensitive to even minor mistakes).
+	reportLevel = com.github.spotbugs.snom.Confidence.valueOf('LOW')
+	excludeFilter = file("spotbugs-exclude.xml")
+}
+
+apply from: rootProject.file('gradle/special-tests.gradle')
+tasks.withType(Test).configureEach {
+	if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_16)) {
+		// https://docs.gradle.org/7.5/userguide/upgrading_version_7.html#removes_implicit_add_opens_for_test_workers
+		jvmArgs "--add-opens=java.base/java.lang=ALL-UNNAMED"
+	}
+
+	if (GradleVersion.current() >= GradleVersion.version('9.0')) {
+		// https://github.com/gradle/gradle/issues/33619
+		failOnNoDiscoveredTests = false
+	}
+}
+
+jar {
+	for (glue in NEEDS_GLUE) {
+		from sourceSets.getByName(glue).output.classesDirs
+	}
+}

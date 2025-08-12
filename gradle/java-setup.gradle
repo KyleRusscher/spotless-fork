@@ -1,0 +1,43 @@
+//////////
+// JAVA //
+//////////
+
+// setup java
+apply plugin: 'java'
+tasks.withType(JavaCompile).configureEach {
+	options.encoding = 'UTF-8'
+	options.release = Integer.parseInt(VER_JAVA)
+}
+
+//////////////
+// SPOTBUGS //
+//////////////
+apply plugin: 'com.github.spotbugs'
+spotbugs {
+	ignoreFailures = false 	// bug free or it doesn't ship!
+	// LOW|MEDIUM|DEFAULT|HIGH (low = sensitive to even minor mistakes).
+	reportLevel = com.github.spotbugs.snom.Confidence.valueOf('MEDIUM')
+	omitVisitors = [
+		// https://spotbugs.readthedocs.io/en/latest/detectors.html#constructorthrow
+		'ConstructorThrow',
+		// https://spotbugs.readthedocs.io/en/latest/detectors.html#findreturnref
+		'FindReturnRef',
+	]
+}
+tasks.named('spotbugsTest') {
+	enabled = false
+}
+
+tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {
+	outputs.file(project.layout.buildDirectory.file("reports/spotbugs/${it.name}.html"))
+	outputs.file(project.layout.buildDirectory.file("spotbugs/auxclasspath/${it.name}"))
+	reports {
+		html.enabled = true
+	}
+}
+
+dependencies {
+	compileOnly 'net.jcip:jcip-annotations:1.0'
+	compileOnly "com.github.spotbugs:spotbugs-annotations:${spotbugs.toolVersion.get()}"
+	compileOnly "com.google.code.findbugs:jsr305:${VER_JSR_305}"
+}
