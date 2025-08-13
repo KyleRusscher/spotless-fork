@@ -10,7 +10,7 @@ def decode64(String varName) {
 }
 
 if (project.parent == null) {
-	group = 'com.diffplug.spotless'
+	group = 'io.github.kylerusscher'
 	def pass = System.env['ORG_GRADLE_PROJECT_nexus_pass64']
 	if (pass != null) {
 		pass = pass.decodeBase64()
@@ -99,7 +99,8 @@ model {
 	publishing {
 		publications {
 			pluginMaven(MavenPublication) {
-				if (project.ext.artifactId != 'spotless-plugin-gradle') {
+				// Don't attach components.java for the Gradle plugin module itself
+				if (project.name != 'plugin-gradle') {
 					from components.java
 				}
 
@@ -113,16 +114,30 @@ model {
 				def rootProjectName = rootProject.name
 
 				pom.withXml {
-					// add MavenCentral requirements to the POM
-					asNode().children().last() + {
+					// add MavenCentral requirements to the POM, first remove any existing duplicates
+					def root = asNode()
+					[
+						'name',
+						'description',
+						'url',
+						'licenses',
+						'developers',
+						'scm'
+					].each { tag ->
+						def nodes = root.get(tag)
+						if (nodes) {
+							nodes.each { root.remove(it) }
+						}
+					}
+					root.children().last() + {
 						resolveStrategy = Closure.DELEGATE_FIRST
 						name projectExtArtifactId
 						description projectDescription
-						url "https://github.com/${projectOrg}/${rootProjectName}"
+						url "https://github.com/KyleRusscher/spotless-gagarin"
 						scm {
-							url "https://github.com/${projectOrg}/${rootProjectName}"
-							connection "scm:git:https://github.com/${projectOrg}/${rootProjectName}.git"
-							developerConnection "scm:git:ssh:git@github.com/${projectOrg}/${rootProjectName}.git"
+							url "https://github.com/KyleRusscher/spotless-gagarin"
+							connection "scm:git:https://github.com/KyleRusscher/spotless-gagarin.git"
+							developerConnection "scm:git:ssh:git@github.com/KyleRusscher/spotless-gagarin.git"
 						}
 						licenses {
 							if (isExt) {
@@ -144,30 +159,15 @@ model {
 							prerequisites { maven '3.1.0' }
 						}
 						developers {
-							if (isExt) {
-								project.ext.developers.each { extId, extValues ->
-									developer {
-										id extId
-										name extValues['name']
-										email extValues['email']
-									}
-								}
-							} else {
-								if (isPluginMaven) {
-									developer {
-										id 'lutovich'
-										name 'Konstantin Lutovich'
-										email 'konstantin.lutovich@neotechnology.com'
-									}
-								}
-								developer {
-									id 'nedtwigg'
-									name 'Ned Twigg'
-									email 'ned.twigg@diffplug.com'
-								}
+							developer {
+								id 'kylerusscher'
+								name 'Kyle Russcher'
+								url 'https://github.com/KyleRusscher'
 							}
 						}
 					}
+
+					// No extra POM mutation at runtime to keep config cache compatible
 				}
 			}
 		}

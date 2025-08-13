@@ -7,7 +7,7 @@ output = [
   link(shield('Javadoc', 'javadoc', 'here', 'blue'), 'https://javadoc.io/doc/com.diffplug.spotless/spotless-maven-plugin/{{versionLast}}/index.html')
   ].join('\n');
 -->
-[![MavenCentral](https://img.shields.io/badge/mavencentral-com.diffplug.spotless%3Aspotless--maven--plugin-blue.svg)](https://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22com.diffplug.spotless%22%20AND%20a%3A%22spotless-maven-plugin%22)
+[![MavenCentral](https://img.shields.io/badge/mavencentral-io.github.kylerusscher%3Aspotless--maven--plugin--gagarin-blue.svg)](https://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22io.github.kylerusscher%22%20AND%20a%3A%22spotless-maven-plugin-gagarin%22)
 [![Changelog](https://img.shields.io/badge/changelog-2.46.1-blue.svg)](CHANGES.md)
 [![Javadoc](https://img.shields.io/badge/javadoc-here-blue.svg)](https://javadoc.io/doc/com.diffplug.spotless/spotless-maven-plugin/2.46.1/index.html)
 <!---freshmark /shields -->

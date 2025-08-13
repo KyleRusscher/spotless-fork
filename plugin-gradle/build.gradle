@@ -9,17 +9,13 @@ apply from: rootProject.file('gradle/spotless-freshmark.gradle')
 
 
 dependencies {
-	if (version.endsWith('-SNAPSHOT') || (rootProject.spotlessChangelog.versionNext == rootProject.spotlessChangelog.versionLast)) {
-		api projects.lib
-		api projects.libExtra
-	} else {
-		api "com.diffplug.spotless:spotless-lib:${rootProject.spotlessChangelog.versionLast}"
-		api "com.diffplug.spotless:spotless-lib-extra:${rootProject.spotlessChangelog.versionLast}"
-	}
+    // Use local projects so runtime uses our modified lib code (e.g., forked Palantir coordinates)
+    api projects.lib
+    api projects.libExtra
 	implementation "com.diffplug.durian:durian-core:${VER_DURIAN}"
 	implementation "com.diffplug.durian:durian-io:${VER_DURIAN}"
 	implementation "com.diffplug.durian:durian-collect:${VER_DURIAN}"
-	implementation "org.eclipse.jgit:org.eclipse.jgit:${VER_JGIT}"
+	implementation "org.eclipse.jgit:org.eclipse.jgit:6.10.1.202505221210-r"
 
 	testImplementation projects.testlib
 	testImplementation "org.junit.jupiter:junit-jupiter:${VER_JUNIT}"
@@ -42,8 +38,8 @@ tasks.validatePlugins {
 // GRADLE PLUGIN PORTAL //
 //////////////////////////
 gradlePlugin {
-	website = "https://github.com/diffplug/spotless"
-	vcsUrl = "https://github.com/diffplug/spotless"
+	website = "https://github.com/KyleRusscher/spotless-gagarin"
+	vcsUrl = "https://github.com/KyleRusscher/spotless-gagarin"
 	plugins {
 		spotlessPlugin {
 			id = 'com.diffplug.spotless'
