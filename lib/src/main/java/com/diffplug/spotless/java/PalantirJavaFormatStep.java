@@ -25,7 +25,8 @@ import com.diffplug.spotless.*;
  * <a href="https://github.com/google/google-java-format">google-java-format</a> as a FormatterStep. */
 public class PalantirJavaFormatStep implements Serializable {
 	private static final long serialVersionUID = 1L;
-	private static final boolean DEFAULT_FORMAT_JAVADOC = false;
+    private static final boolean DEFAULT_FORMAT_JAVADOC = false;
+    private static final int DEFAULT_MAX_LINE_LENGTH = -1;
 	private static final String DEFAULT_STYLE = "PALANTIR";
 	private static final String NAME = "palantir-java-format-fork";
 	public static final String MAVEN_COORDINATE = "io.github.kylerusscher:palantir-java-format-fork:";
@@ -35,18 +36,22 @@ public class PalantirJavaFormatStep implements Serializable {
 	private final JarState.Promised jarState;
 	/** Version of the formatter jar. */
 	private final String formatterVersion;
-	private final String style;
-	/** Whether to format Java docs. */
-	private final boolean formatJavadoc;
+    private final String style;
+    /** Whether to format Java docs. */
+    private final boolean formatJavadoc;
+    /** Optional max line length override. */
+    private final int maxLineLength;
 
 	private PalantirJavaFormatStep(JarState.Promised jarState,
 			String formatterVersion,
-			String style,
-			boolean formatJavadoc) {
+            String style,
+            boolean formatJavadoc,
+            int maxLineLength) {
 		this.jarState = jarState;
 		this.formatterVersion = formatterVersion;
 		this.style = style;
-		this.formatJavadoc = formatJavadoc;
+        this.formatJavadoc = formatJavadoc;
+        this.maxLineLength = maxLineLength;
 	}
 
 	/** Creates a step which formats everything - code, import order, and unused imports. */
@@ -71,16 +76,30 @@ public class PalantirJavaFormatStep implements Serializable {
 	 * Creates a step which formats everything - code, import order, unused imports, and Java docs. And with the given
 	 * format style.
 	 */
-	public static FormatterStep create(String version, String style, boolean formatJavadoc, Provisioner provisioner) {
+    public static FormatterStep create(String version, String style, boolean formatJavadoc, Provisioner provisioner) {
 		Objects.requireNonNull(version, "version");
 		Objects.requireNonNull(style, "style");
 		Objects.requireNonNull(provisioner, "provisioner");
 
 		return FormatterStep.create(NAME,
-				new PalantirJavaFormatStep(JarState.promise(() -> JarState.from(MAVEN_COORDINATE + version, provisioner)), version, style, formatJavadoc),
+                new PalantirJavaFormatStep(JarState.promise(() -> JarState.from(MAVEN_COORDINATE + version, provisioner)), version, style, formatJavadoc, DEFAULT_MAX_LINE_LENGTH),
 				PalantirJavaFormatStep::equalityState,
 				State::createFormat);
 	}
+
+    /**
+     * Creates a step which formats everything and overrides max line length if > 0.
+     */
+    public static FormatterStep create(String version, String style, boolean formatJavadoc, int maxLineLength, Provisioner provisioner) {
+        Objects.requireNonNull(version, "version");
+        Objects.requireNonNull(style, "style");
+        Objects.requireNonNull(provisioner, "provisioner");
+
+        return FormatterStep.create(NAME,
+                new PalantirJavaFormatStep(JarState.promise(() -> JarState.from(MAVEN_COORDINATE + version, provisioner)), version, style, formatJavadoc, maxLineLength),
+                PalantirJavaFormatStep::equalityState,
+                State::createFormat);
+    }
 
 	/** Get default formatter version */
 	public static String defaultVersion() {
@@ -98,7 +117,7 @@ public class PalantirJavaFormatStep implements Serializable {
 	}
 
 	private State equalityState() {
-		return new State(jarState.get(), formatterVersion, style, formatJavadoc);
+        return new State(jarState.get(), formatterVersion, style, formatJavadoc, maxLineLength);
 	}
 
 	private static final class State implements Serializable {
@@ -107,22 +126,37 @@ public class PalantirJavaFormatStep implements Serializable {
 		private final JarState jarState;
 		private final String formatterVersion;
 		private final String style;
-		private final boolean formatJavadoc;
+        private final boolean formatJavadoc;
+        private final int maxLineLength;
 
-		State(JarState jarState, String formatterVersion, String style, boolean formatJavadoc) {
+        State(JarState jarState, String formatterVersion, String style, boolean formatJavadoc, int maxLineLength) {
 			ModuleHelper.doOpenInternalPackagesIfRequired();
 			this.jarState = jarState;
 			this.formatterVersion = formatterVersion;
 			this.style = style;
-			this.formatJavadoc = formatJavadoc;
+            this.formatJavadoc = formatJavadoc;
+            this.maxLineLength = maxLineLength;
 		}
 
 		FormatterFunc createFormat() throws Exception {
 			final ClassLoader classLoader = jarState.getClassLoader();
 			final Class<?> formatterFunc = classLoader.loadClass("com.diffplug.spotless.glue.pjf.PalantirJavaFormatFormatterFunc");
 			// 1st arg is "style", 2nd arg is "formatJavadoc"
-			final Constructor<?> constructor = formatterFunc.getConstructor(String.class, boolean.class);
-			return JVM_SUPPORT.suggestLaterVersionOnError(formatterVersion, (FormatterFunc) constructor.newInstance(style, formatJavadoc));
+            FormatterFunc instance;
+            try {
+                if (maxLineLength > 0) {
+                    final Constructor<?> ctor3 = formatterFunc.getConstructor(String.class, boolean.class, Integer.class);
+                    instance = (FormatterFunc) ctor3.newInstance(style, formatJavadoc, Integer.valueOf(maxLineLength));
+                } else {
+                    final Constructor<?> ctor2 = formatterFunc.getConstructor(String.class, boolean.class);
+                    instance = (FormatterFunc) ctor2.newInstance(style, formatJavadoc);
+                }
+            } catch (NoSuchMethodException e) {
+                // Fall back to 2-arg constructor if 3-arg is not available
+                final Constructor<?> ctor2 = formatterFunc.getConstructor(String.class, boolean.class);
+                instance = (FormatterFunc) ctor2.newInstance(style, formatJavadoc);
+            }
+            return JVM_SUPPORT.suggestLaterVersionOnError(formatterVersion, instance);
 		}
 	}
 }

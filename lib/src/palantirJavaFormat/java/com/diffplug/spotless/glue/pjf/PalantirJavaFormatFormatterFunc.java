@@ -27,9 +27,9 @@ import com.diffplug.spotless.FormatterFunc;
 
 public class PalantirJavaFormatFormatterFunc implements FormatterFunc {
 
-	private final Formatter formatter;
+    private final Formatter formatter;
 
-	private final JavaFormatterOptions.Style formatterStyle;
+    private final JavaFormatterOptions.Style formatterStyle;
 
 	/**
 	 * Creates a new formatter func that formats code via Palantir.
@@ -37,15 +37,29 @@ public class PalantirJavaFormatFormatterFunc implements FormatterFunc {
 	 * @param formatJavadoc Whether to format Java docs. Requires at least Palantir 2.36.0 or later, otherwise the
 	 * constructor will throw.
 	 */
-	public PalantirJavaFormatFormatterFunc(String style, boolean formatJavadoc) {
-		this.formatterStyle = JavaFormatterOptions.Style.valueOf(style);
-		JavaFormatterOptions.Builder builder = JavaFormatterOptions.builder();
-		builder.style(formatterStyle);
-		if (formatJavadoc) {
-			applyFormatJavadoc(builder);
-		}
-		formatter = Formatter.createFormatter(builder.build());
-	}
+    public PalantirJavaFormatFormatterFunc(String style, boolean formatJavadoc) {
+        this(style, formatJavadoc, null);
+    }
+
+    /**
+     * Creates a new formatter func that formats code via Palantir, with an optional max line length override.
+     * @param style The style to use for formatting.
+     * @param formatJavadoc Whether to format Java docs. Requires at least Palantir 2.36.0 or later, otherwise the
+     * constructor will throw.
+     * @param maxLineLength Optional max line length override. Requires a Palantir version which supports it.
+     */
+    public PalantirJavaFormatFormatterFunc(String style, boolean formatJavadoc, Integer maxLineLength) {
+        this.formatterStyle = JavaFormatterOptions.Style.valueOf(style);
+        JavaFormatterOptions.Builder builder = JavaFormatterOptions.builder();
+        builder.style(formatterStyle);
+        if (formatJavadoc) {
+            applyFormatJavadoc(builder);
+        }
+        if (maxLineLength != null) {
+            applyMaxLineLength(builder, maxLineLength.intValue());
+        }
+        formatter = Formatter.createFormatter(builder.build());
+    }
 
 	@Override
 	public String apply(String input) throws Exception {
@@ -70,4 +84,16 @@ public class PalantirJavaFormatFormatterFunc implements FormatterFunc {
 			throw new IllegalStateException("Cannot enable formatJavadoc option, make sure you are using Palantir with version 2.36.0 or later", e);
 		}
 	}
+
+    private static void applyMaxLineLength(JavaFormatterOptions.Builder builder, int maxLineLength) {
+        // The maxLineLength override is only available in updated forks. Attempt to invoke via reflection.
+        try {
+            Method maxLineLengthMethod = JavaFormatterOptions.Builder.class.getMethod("maxLineLength", int.class);
+            maxLineLengthMethod.invoke(builder, maxLineLength);
+        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
+            throw new IllegalStateException(
+                    "Cannot set maxLineLength option, make sure you are using a Palantir fork which supports it",
+                    e);
+        }
+    }
 }

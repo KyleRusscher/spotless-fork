@@ -261,6 +261,7 @@ public class JavaExtension extends FormatExtension implements HasBuiltinDelimite
 		final String version;
 		String style;
 		boolean formatJavadoc;
+		Integer maxLineLength;
 
 		PalantirJavaFormatConfig(String version) {
 			this.version = Objects.requireNonNull(version);
@@ -280,7 +281,17 @@ public class JavaExtension extends FormatExtension implements HasBuiltinDelimite
 			return this;
 		}
 
+		public PalantirJavaFormatConfig maxLineLength(int maxLineLength) {
+			this.maxLineLength = Integer.valueOf(maxLineLength);
+			replaceStep(createStep());
+			return this;
+		}
+
 		private FormatterStep createStep() {
+			int ml = maxLineLength != null ? maxLineLength.intValue() : -1;
+			if (ml > 0) {
+				return PalantirJavaFormatStep.create(version, style, formatJavadoc, ml, provisioner());
+			}
 			return PalantirJavaFormatStep.create(version, style, formatJavadoc, provisioner());
 		}
 	}
